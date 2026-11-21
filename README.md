@@ -6,9 +6,9 @@ Small pixel-art dioramas sculpted, baked and rendered with Ink Studio. One folde
 
 ## 场景 / Scenes
 
-| 文件夹 | 场景 |
-| --- | --- |
-| [`night-stall/`](night-stall/) | 雨夜小吃摊 · Rainy Night Food Stall：雨夜街边的三轮面摊，36 秒无缝循环 |
+| 文件夹 | 场景 | 预览 |
+| --- | --- | --- |
+| [`night-stall/`](night-stall/) | 雨夜小吃摊 · Rainy Night Food Stall：雨夜街边的三轮面摊，36 秒无缝循环 | [在线预览](https://claude.ai/artifact/HCzUsvWqERjQcgJjRuUUFo) |
 
 ## 使用 / Usage
 
