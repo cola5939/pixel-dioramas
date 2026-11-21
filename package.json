@@ -1,0 +1,15 @@
+{
+  "name": "pixel-dioramas",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Small pixel-art dioramas made with Ink Studio: one folder per scene, each with its film, music and drag-to-turn page.",
+  "scripts": {
+    "night-stall:page": "node night-stall/build-page.mjs",
+    "night-stall:film": "node night-stall/film.mjs",
+    "night-stall:music": "node night-stall/music.mjs"
+  },
+  "devDependencies": {
+    "@shapeshift-labs/ink-studio": "github:siliconjungle/shapeshift-labs-ink-studio#a7e8eacb2795c39cbc29cce5ff1e805ebeb13d52",
+    "esbuild": "0.28.2"
+  }
+}

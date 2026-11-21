@@ -1,0 +1,4 @@
+node_modules/
+# everything the scripts make (films, music, pages): build them again from the sources
+out/
+.DS_Store
