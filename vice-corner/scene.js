@@ -254,13 +254,14 @@ function animate(K, world, moves, opt) {
 
 /* ── what happens, by the clock ─────────────────────────────────────────────────────────────────────────────────────
    Each of these is a plain function of the time, so the page can ask them too (it lights the haze and the road by them). */
-const wrap = t => ((t % LOOP) + LOOP) % LOOP;
+const wrap = t => (t >= 0 && t < LOOP ? t : ((t % LOOP) + LOOP) % LOOP);   // (a time already in the loop is left exactly as it is)
 const once = (t, a, d) => (t > a && t < a + d ? Math.sin((Math.PI * (t - a)) / d) : 0);            // one rise and fall, d long
 const held = (t, a, b, e) => smooth((t - a) / e) * (1 - smooth((t - b + e) / e));                 // 1 from a to b, eased over e
-/* the police car's lamps: red and blue turn about, each a double blink. And the store's alarm, slower */
-const BEAT = every(0.72);
+/* the police car's lamps: red and blue turn about, each a double blink, one lamp to each beat of the music (music.mjs:
+   a beat is 0.45 s, so the two lamps take 0.9). And the store's alarm, slower */
+const FLASH = every(0.9);
 function flash(t) {
-  const u = (wrap(t) / BEAT) % 1, blink = v => (v < 0.16 || (v > 0.24 && v < 0.4) ? 1 : 0);
+  const u = (wrap(t) / FLASH) % 1, blink = v => (v < 0.16 || (v > 0.24 && v < 0.4) ? 1 : 0);
   return { red: blink(u), blue: blink((u + 0.5) % 1), alarm: (wrap(t) / every(1.2)) % 1 < 0.5 ? 1 : 0 };
 }
 /* the lowrider: a set of hops on its front wheels, then a rest, four times round the loop. The angle its nose is up
@@ -284,10 +285,12 @@ function beam(t) {
   const to = [MARK[0] + 0.22 * Math.sin(t * pace(0.5) + 1), MARK[1], MARK[2] + 0.14 * Math.sin(t * pace(0.83))];
   return { from, to };
 }
-/* the fourth star: lit for a while, twice in the loop, coming on with a stutter */
+/* the fourth star: lit for a while, twice in the loop, coming on with a stutter. It comes and goes on beats of the
+   music, which rings a little bell each time (music.mjs reads these) */
+const FOURTH = [[9.9, 17.1], [27, 31.5]];
 function fourth(t) {
   const u = wrap(t);
-  for (const [a, b] of [[9.5, 17], [27, 31.5]]) if (u > a && u < b) return u - a < 0.5 ? (Math.floor((u - a) * 12) % 2 ? 1 : 0) : 1;
+  for (const [a, b] of FOURTH) if (u >= a && u < b) return u - a < 0.5 ? (Math.floor((u - a) * 12) % 2 ? 0 : 1) : 1;
   return 0;
 }
 
@@ -404,12 +407,14 @@ function rig(K, world, tags) {
 function camera(t) {
   const u = (t / LOOP) * TAU;
   return {
-    // (it looks at a point behind the store's front, about the middle of the slab, so that the corner stays in the
-    // picture all the way round; from the front that is the same picture as looking at the lowrider from nearer)
-    target: [-0.22, 2.02 + 0.1 * Math.sin(u) ** 2, -1.05],
+    // (it looks at a point behind the store's front, so that the corner stays in the picture all the way round; from
+    // the front that is the same picture as looking at the lowrider from nearer. Going round to the back it looks
+    // further back, at the middle of the block, and stands further off: the alley is then the near side, and it would
+    // be cut off at the edges of the picture)
+    target: [-0.22, 2.02 + 0.1 * Math.sin(u) ** 2, -1.05 - 0.95 * (1 - Math.cos(u)) / 2],
     yaw: -0.36 + u - 0.3 * Math.sin(u),
     pitch: 0.085 + 0.06 * (1 - Math.cos(u)),
-    dist: 15.1 + 0.6 * (1 - Math.cos(2 * u)) / 2
+    dist: 15.1 + 0.6 * (1 - Math.cos(2 * u)) / 2 + 1.6 * (1 - Math.cos(u)) / 2
   };
 }
 
@@ -1313,6 +1318,8 @@ module.exports.camera = camera;
 module.exports.GLOW = GLOW;
 module.exports.beam = beam;
 module.exports.SUN = SUN;
+module.exports.FOURTH = FOURTH;
+module.exports.FLASH = FLASH;
 module.exports.SCENE = { LAMP, COP, CAR, MARK, HELI, STORE, hex: Object.fromEntries(Object.entries(C).map(([k, v]) => [k, v.map(hex)])) };
 /* For a page that is to open at once and not sculpt and bake first: `pack` does the sculpting (the `web` variant, for a
    page that turns the view itself) and gives the world that makes as data, { plain, arrays }; `unpack` is given the

@@ -7,7 +7,9 @@
     "night-stall:page": "node night-stall/build-page.mjs",
     "night-stall:film": "node night-stall/film.mjs",
     "night-stall:music": "node night-stall/music.mjs",
-    "vice-corner:page": "node vice-corner/build-page.mjs"
+    "vice-corner:page": "node vice-corner/build-page.mjs",
+    "vice-corner:film": "node vice-corner/film.mjs",
+    "vice-corner:music": "node vice-corner/music.mjs"
   },
   "devDependencies": {
     "@shapeshift-labs/ink-studio": "github:siliconjungle/shapeshift-labs-ink-studio#a7e8eacb2795c39cbc29cce5ff1e805ebeb13d52",

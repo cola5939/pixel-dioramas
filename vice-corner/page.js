@@ -16,6 +16,9 @@
 //   the wet road      Ink draws the scene a second time from under the ground looking up, which is what a mirror lying
 //                     on the road shows; the pass lays that into the pixels that are road or pool, and where nothing
 //                     stands to be mirrored, the sky.
+// Everything on the page, the pass included, is worked out from where in the 36-second loop it is, so the end of the loop
+// leads back into its start. film.mjs films the page itself, a frame at a time (`film` below), for that reason: Ink's
+// CPU renderer would draw the scene without the sky, the haze and the wet road.
 // For that the pass has to know, of each pixel, what it shows and how far off it is. Ink's render graph can add a
 // number of its own to every pixel a chosen set of splats shows: here it adds, into the low bits of a pixel's colour
 // (which the scene's `web` palette leaves clear), a note of each splat's kind and of its distance from the eye.
@@ -29,6 +32,7 @@ const NEAR = 5.5, FAR = 22, LOW = 0.02, HIGH = 1.3;
 const REACH = 11, STEPS = 64;               // how far from where the eye looks anything in the scene is; distances are noted in 64 steps across that
 const ROAD = 1, POOL = 2, GLOWS = 3;        // a splat's kind, as noted
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lap = n => (2 * Math.PI * n) / LOOP;   // the speed (radians a second) of a thing that goes round n whole times in the loop
 const bytes = hex => (typeof hex === 'number' ? [hex >> 16, (hex >> 8) & 255, hex & 255] : [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)));
 const rgb = hex => bytes(hex).map(v => v / 255);
 
@@ -118,7 +122,7 @@ function start(world) {
   // a pass of the render graph that adds, to every pixel, its splat's note times `most` (so the note lands in those bits)
   const add = (tag, most) => ({ id: tag, type: 'composite', select: { tag }, layer: { source: { w: 1, h: 1, rgba: new Uint8Array([...most, 255]) }, blend: 'add' } });
   const frameOptions = { stepAnimation: false, damp: false, renderGraph: { passes: [add('kind', [3, 0, 0]), add('far-low', [0, 3, 0]), add('far-high', [0, 0, 15])] } };
-  let time = 0, clock = 0, last = performance.now(), paused = false, drawn = false, noted = '';
+  let time = 0, last = performance.now(), paused = false, filming = false, drawn = false, noted = '';
 
   // rows of the splat table that are rewritten every frame, to send again (the puppet's parts are not: they move by their bones)
   const changedRows = [], { first, count } = world.web.rows;
@@ -173,12 +177,16 @@ function start(world) {
   }, { passive: false });
   canvas.addEventListener('dblclick', () => Object.assign(view, { target: home.target.slice(), yaw: home.yaw, pitch: home.pitch, dist: home.dist }));
 
-  function draw() {
-    /* An art pixel is a whole number of screen pixels, so the picture stays crisp: the most that still lets the window
-       hold nearly all of the film's frame, each way. And an art pixel takes in as much of the scene as it does in the
-       film, whatever the window: so a taller window sees more above and below, through a wider lens. */
+  /* How big the picture is, in the window. An art pixel is a whole number of screen pixels, so the picture stays crisp:
+     the most that still lets the window hold nearly all of the film's frame, each way. And an art pixel takes in as much
+     of the scene as it does in the film, whatever the window: so a taller window sees more above and below, through a
+     wider lens. */
+  function fit() {
     const px = Math.max(1, Math.floor(Math.min(innerWidth / (0.9 * FRAME[0]), innerHeight / (0.9 * FRAME[1]))));
-    const w = Math.max(16, Math.ceil(innerWidth / px)), h = Math.max(16, Math.ceil(innerHeight / px));
+    return { px, w: Math.max(16, Math.ceil(innerWidth / px)), h: Math.max(16, Math.ceil(innerHeight / px)) };
+  }
+
+  function draw({ w, h, px } = fit()) {
     const lens = Math.min(0.62, (LENS * h) / FRAME[1]), fov = 2 * Math.atan(lens);
     canvas.style.width = w * px + 'px'; canvas.style.height = h * px + 'px';
     Object.assign(world.cam, view);
@@ -192,22 +200,35 @@ function start(world) {
       width: w, height: h, time, ...(drawn && { changedRows: [] }), outline: false, clean: false, stepAnimation: false, damp: false,
       camera: { target: [target[0], 2 * wet.at - target[1], target[2]], yaw, pitch: -pitch, dist, fov }
     });
-    finish.draw(ink, below && under, w, h, view, lens, time, clock);
+    finish.draw(ink, below && under, w, h, view, lens, time);
     if (!drawn) { drawn = true; note.remove(); }
   }
 
   function frame(now) {
     requestAnimationFrame(frame);
+    if (filming) return;          // (film.mjs draws every frame itself)
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    if (!paused) { time = (time + dt) % LOOP; clock += dt; }
+    if (!paused) time = (time + dt) % LOOP;
     draw();
   }
   requestAnimationFrame(frame);
 
-  // for looking at it from the console
+  /* For film.mjs: the film's frame at the moment t of the loop, from the scene's own camera, as a PNG of FRAME's size in
+     art pixels. It is read back in the task it is drawn in, before the browser may clear the canvas. From the first
+     call on, the page draws nothing of its own accord. */
+  function film(t) {
+    filming = true;
+    time = t;
+    const shot = filmCamera(t);
+    Object.assign(view, { target: shot.target.slice(), yaw: shot.yaw, pitch: shot.pitch, dist: shot.dist });
+    draw({ w: FRAME[0], h: FRAME[1], px: 1 });
+    return canvas.toDataURL('image/png');
+  }
+
+  // for looking at it from the console, and for film.mjs
   window.__vice = {
-    world, view, renderer, frameOptions, draw, filmCamera, ink, under, notes,
+    world, view, renderer, frameOptions, draw, filmCamera, film, FRAME, ink, under, notes,
     get time() { return time; }, set time(t) { time = t; },
     get paused() { return paused; }, set paused(v) { paused = v; }
   };
@@ -236,7 +257,7 @@ precision highp int;
 uniform sampler2D u_scene, u_under;
 uniform vec2 u_size, u_lens, u_far;             // (u_far: the nearest distance noted, and the size of a step)
 uniform vec3 u_eye, u_right, u_up, u_back;
-uniform float u_drift, u_clock;
+uniform float u_drift, u_time;                  // (u_time: where in the loop it is, in seconds)
 uniform vec3 u_sun;                             // the way to the sun, as it is drawn (lower than it lights from)
 uniform vec4 u_lamp[${P}], u_lampLight[${P}];   // where and how far it reaches; its colour times its strength now, and a ceiling
 uniform vec4 u_beam, u_beamAxis, u_beamLight;   // the searchlight: where and reach; its axis and the cosine of its edge; colour, cosine of its core
@@ -261,10 +282,11 @@ float vnoise(vec2 p) {
   return mix(mix(hash1(i), hash1(i + vec2(1.0, 0.0)), q.x), mix(hash1(i + vec2(0.0, 1.0)), hash1(i + vec2(1.0, 1.0)), q.x), q.y);
 }
 float fbm(vec2 p) { return 0.5 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.2 * vnoise(p * 4.1 + 3.7); }
-// how much cloud there is at a bearing and a height in the sky (over 0: cloud). Clouds keep low, in long banks
+// how much cloud there is at a bearing and a height in the sky (over 0: cloud). Clouds keep low, in long banks. (They do
+// not drift: at the end of the loop they would have to be back where they were at its start.)
 float cloud(float az, float el) {
   float lie = smoothstep(0.015, 0.1, el) * (1.0 - smoothstep(0.34, 0.75, el));
-  return fbm(vec2(az * 2.6 + u_clock * 0.004, el * 8.5)) + 0.2 * vnoise(vec2(az * 9.0 - u_clock * 0.006, el * 26.0)) - 0.66 - (1.0 - lie) * 0.5;
+  return fbm(vec2(az * 2.6, el * 8.5)) + 0.2 * vnoise(vec2(az * 9.0, el * 26.0)) - 0.66 - (1.0 - lie) * 0.5;
 }
 /* The evening, the way d looks. \`rank\` and \`rank2\` are the pixel's places in two orders, for laying one band into the
    next in a pattern. */
@@ -278,10 +300,13 @@ vec3 sky(vec3 d, float rank, float rank2) {
     float depth = -el, g = pow(depth / 1.5708, 0.42) * ${f(SEA_SUN.length - 1)};
     int i = int(clamp(floor(g + (rank - 0.5) * 0.9), 0.0, ${f(SEA_SUN.length - 1)}));
     vec3 c = rank2 < toward ? SEA_SUN[i] : SEA_FAR[i];
-    // the sun's road on the water: short bright strokes, thick under the sun and near the horizon, thinning toward us
+    // the sun's road on the water: short bright strokes, thick under the sun and near the horizon, thinning toward us.
+    // Each row of them slides along by a whole number of strokes in the loop, and its strokes come round again after
+    // that many: so at the end of the loop the row is as it was at the start
     float row = floor(depth * 300.0), reach = 1.0 - smoothstep(0.0, 0.75, depth);
     float lane = (1.0 - smoothstep(0.02, 0.1 + depth * 0.9, away)) * reach;
-    float seg = floor(az * 90.0 + hash1(vec2(row, 1.0)) * 40.0 + u_clock * (0.5 + hash1(vec2(row, 2.0))));
+    float slide = floor(${f(LOOP)} * (0.5 + hash1(vec2(row, 2.0))) + 0.5);
+    float seg = mod(floor(az * 90.0 + hash1(vec2(row, 1.0)) * 40.0 + u_time * slide / ${f(LOOP)}), slide);
     float spark = hash1(vec2(seg, row));
     if (spark < lane * 0.62) c = spark < lane * 0.2 ? ${v3('#fff1b8')} : ${v3('#ffc56e')};
     else if (spark > 1.0 - 0.035 * reach * (0.2 + toward)) c = mix(c, ${v3('#ffb0a0')}, 0.5);    // and a glint here and there besides
@@ -414,8 +439,8 @@ void main() {
 ${wet ? `  if (ground) {
     vec4 shown;
     if (kind == ${POOL}) {
-      // (still water, but not glass: it shivers a little)
-      vec2 slope = 1.3 * vec2(sin(p.x * 9.0 + u_clock * 1.7) + sin(p.z * 5.0 - u_clock * 1.1), sin(p.z * 11.0 + u_clock * 1.3));
+      // (still water, but not glass: it shivers a little, each shiver a whole number of times round in the loop)
+      vec2 slope = 1.3 * vec2(sin(p.x * 9.0 + u_time * ${f(lap(10))}) + sin(p.z * 5.0 - u_time * ${f(lap(6))}), sin(p.z * 11.0 + u_time * ${f(lap(7))}));
       shown = mirrored(at + ivec2(floor(vec2(dot(slope, u_right.xz), dot(slope, u_up.xz)) + 0.5)));
     } else {
       shown = 0.4 * mirrored(at) + 0.15 * (mirrored(at + ivec2(${Math.round(wet.road.blur)}, 0)) + mirrored(at - ivec2(${Math.round(wet.road.blur)}, 0)) +
@@ -510,11 +535,11 @@ ${wet ? `  if (ground) {
   }
   const at = {
     size: U('u_size'), lens: U('u_lens'), far: U('u_far'), eye: U('u_eye'), right: U('u_right'), up: U('u_up'), back: U('u_back'),
-    drift: U('u_drift'), clock: U('u_clock'), light: U('u_lampLight'), wash: U('u_washLight'),
+    drift: U('u_drift'), time: U('u_time'), light: U('u_lampLight'), wash: U('u_washLight'),
     beam: U('u_beam'), beamAxis: U('u_beamAxis'), beamLight: U('u_beamLight')
   };
   return {
-    draw(scene, under, w, h, { target: aim, yaw, pitch, dist }, lens, t, clock) {
+    draw(scene, under, w, h, { target: aim, yaw, pitch, dist }, lens, t) {
       if (target.width !== w) target.width = w;
       if (target.height !== h) target.height = h;
       gl.viewport(0, 0, w, h);
@@ -535,7 +560,7 @@ ${wet ? `  if (ground) {
       gl.uniform3f(at.up, -sp * sy, cp, -sp * cy);
       gl.uniform3fv(at.back, back);
       gl.uniform1f(at.drift, t * glow.drift);
-      gl.uniform1f(at.clock, clock);
+      gl.uniform1f(at.time, ((t % LOOP) + LOOP) % LOOP);
       // every lamp as it is at this moment: some of them flash
       const pulse = glow.pulse(t), now = p => (p.pulse ? pulse[p.pulse] : 1);
       gl.uniform4fv(at.light, glow.points.flatMap(p => [...rgb(p.color).map(v => v * p.intensity * now(p)), p.under ?? 1e9]));

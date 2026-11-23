@@ -20,7 +20,9 @@ npm install
 npm run night-stall:page    # 网页：out/night-stall.html（单文件，双击打开）和 out/artifact/
 npm run night-stall:film    # 影片：out/night-stall.mp4，30 fps 1920×1080，约 25 分钟
 npm run night-stall:music   # 配乐：out/night-stall-music.wav
-npm run vice-corner:page    # 网页：vice-corner/out/vice-corner.html（影片和配乐还没做）
+npm run vice-corner:page    # 网页：vice-corner/out/vice-corner.html
+npm run vice-corner:film    # 影片：vice-corner/out/vice-corner.mp4，30 fps 1920×1080，约 1 分钟（录的是网页，需要 Chrome）
+npm run vice-corner:music   # 配乐：vice-corner/out/vice-corner-music.wav 和 .mid；加 -- --into out/vice-corner.mp4 合进影片
 ```
 
 影片的参数示例：`npm run night-stall:film -- --fps 60 --out out/night-stall-60fps.mp4`，或者用 `--still 0,9,18` 只出几张静帧。每个脚本开头的注释里有完整参数说明。生成的文件都在各场景的 `out/` 下，不进仓库。
@@ -31,8 +33,8 @@ npm run vice-corner:page    # 网页：vice-corner/out/vice-corner.html（影片
 
 - `scene.js`：场景本身（雕刻、材质、动画、天气、镜头）
 - `build-page.mjs` + `page.js`：网页（WebGL 实时渲染，场景在构建时预先烘焙进页面）
-- `film.mjs`：用 Ink Studio 的 CPU 渲染器逐帧渲染，再交给 ffmpeg 编码
-- `music.mjs`：逐采样合成的原创配乐，长度与影片循环一致
+- `film.mjs`：逐帧出图，再交给 ffmpeg 编码。雨夜面摊用 Ink Studio 的 CPU 渲染器；罪恶都市街角用无界面 Chrome 逐帧录网页，因为它的天空、海面、雾和积水倒影是网页自己画的
+- `music.mjs`：逐采样合成的原创配乐，长度与影片循环一致。罪恶都市街角的配乐是 MIDI 风格：先写成 MIDI 音符，用仿通用 MIDI（GM）音色的合成器演奏，同时导出标准 `.mid` 文件；速度和画面对拍（低趴车每跳一下落在底鼓或军鼓上，警灯一拍闪一盏，第四颗星亮起时有钟声）
 
 Ink Studio 锁定在提交 `a7e8eac`，因为它直接从 GitHub 安装，没有发布版本号。
 
