@@ -9,7 +9,7 @@ Small pixel-art dioramas sculpted, baked and rendered with Ink Studio. One folde
 | 文件夹 | 场景 | 预览 |
 | --- | --- | --- |
 | [`night-stall/`](night-stall/) | 雨夜小吃摊 · Rainy Night Food Stall：雨夜街边的三轮面摊，36 秒无缝循环 | [在线预览](https://claude.ai/artifact/HCzUsvWqERjQcgJjRuUUFo) |
-| [`vice-corner/`](vice-corner/) | 罪恶都市街角 · Vice Corner：落日下的街角便利店，颠着液压的低趴车和它上方的五颗通缉星、警车、直升机探照灯、过马路的鳄鱼；整个街区四面都做全了，店后面是一条后巷；场景里不放人物，主角只出现在屋顶广告牌上（戴墨镜的头像）；36 秒无缝循环 | 目前只有本地网页：`npm run vice-corner:page` |
+| [`vice-corner/`](vice-corner/) | 罪恶都市街角 · Vice Corner：落日下的街角便利店，颠着液压的低趴车和它上方的五颗通缉星、警车、直升机探照灯、过马路的鳄鱼；整个街区四面都做全了，店后面是一条后巷；场景里不放人物，主角只出现在屋顶广告牌上（戴墨镜的头像）；36 秒无缝循环 | [在线预览](https://claude.ai/artifact/QoBRCe2QuCU81MkNpVr4hd) |
 
 ## 使用 / Usage
 
